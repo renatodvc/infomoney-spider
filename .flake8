@@ -1,0 +1,14 @@
+[flake8]
+max-line-length = 120
+exclude =
+    *.md,
+    *.yml,
+    *.sh,
+    .gitignore,
+    .venv,
+    .flake8,
+    ./build/lib/*,
+    ./tmp/*,
+    settings.py,
+    *.txt,
+    scrapy.cfg
