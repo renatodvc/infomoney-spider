@@ -29,6 +29,7 @@ Os dados extraídos são armazenados em arquivos CSV na pasta `scraped_data`. Pa
 
 ### Formato dos dados:
 Os dados não sofrem alteração e são armazenados integralmente como são disponibilizados pela plataforma da Infomoney. A estrutura colunar dos dados no CSV é a seguinte:
+
 **`DATA | TIMESTAMP (em formato Posix Time) | Abertura | Máxima | Mínima | Fechamento | Volume | Variação`**
 
 ## A Fazer
