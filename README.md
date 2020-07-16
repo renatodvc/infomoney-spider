@@ -11,7 +11,7 @@ $ pip install -r requirements.txt
 ```
 *Infomoney-spider requer Python 3.6+*
 
-## Utilizando 
+## Utilização
 Execute no terminal:
 ```sh
 $ scrapy crawl infomoney [-a param=value] 
@@ -26,7 +26,7 @@ Exemplo:  `-a start_date=01/01/2019`
 * **end_date**: Busca os dados históricos até a data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada será utilizado o dia da execução. 
 
 Exemplo:  `-a end_date=01/01/2020`
-* **no_earnings**: Se `True` o spider não fará coleta dos dados de proventos (JSCP, dividendos, etc). Padrão é `False`.
+* **no_earnings**: Se `True` o spider não fará coleta dos dados de proventos (JSCP, dividendos, etc). Se não informado a coleta é realizada automaticamente.
 
 Exemplo:  `-a no_earnings=True`
 
@@ -36,7 +36,7 @@ Os dados extraídos são armazenados em arquivos CSV na pasta `scraped_data`. Pa
 ### Formato dos dados:
 Os dados não sofrem alteração e são armazenados integralmente como são disponibilizados pela plataforma da Infomoney.
 
-A estrutura colunar dos dados no CSV é a seguinte:
+A estrutura colunar dos dados nos arquivos CSV seguem os seguintes padrões:
 
 - Histórico de Preço
 
@@ -46,11 +46,10 @@ A estrutura colunar dos dados no CSV é a seguinte:
 
 **`Tipo | Valor | Data Aprovação | Data COM¹ | Data Pagamento | Situação`**
 
-*¹: Infomoney informa este dado como "DATA COM". Possivelmente equivalente a [Data Ex-Dividendos](https://pt.wikipedia.org/wiki/Ex-dividendos)*
+*¹: Infomoney informa este dado como "DATA COM". Possivelmente equivalente a [Data Ex-Dividendos](https://pt.wikipedia.org/wiki/Ex-dividendos).*
 
 
 ## A Fazer
- - Extrair dados da página de proventos
  - Construir arquivo estático para reduzir a quantidade de requests
  - Incluir parâmetro para update do arquivo estático
  - Checar a existência do CSV e incluir parâmetros para incrementar ou substituir.
