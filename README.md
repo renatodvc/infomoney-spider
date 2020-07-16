@@ -18,19 +18,36 @@ $ scrapy crawl infomoney [-a param=value]
 ```
 ### Parâmetros:
 * **asset**: Código do ativo na B3. Se nenhum ativo for informado o spider fará requisições para todos os ativos disponíveis na [lista de cotações da Infomoney](https://www.infomoney.com.br/ferramentas/altas-e-baixas/).
-Exemplo: `-a asset=PETR4` 
+
+Exemplo: `-a asset=PETR4`
 * **start_date**: Busca os dados históricos a partir da data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada a requisição será feita para o período máximo disponível (2 anos).
-Exemplo:  `-a start_date=01/01/2019` 
+
+Exemplo:  `-a start_date=01/01/2019`
 * **end_date**: Busca os dados históricos até a data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada será utilizado o dia da execução. 
-Exemplo:  `-a end_date=01/01/2020` 
+
+Exemplo:  `-a end_date=01/01/2020`
+* **no_earnings**: Se `True` o spider não fará coleta dos dados de proventos (JSCP, dividendos, etc). Padrão é `False`.
+
+Exemplo:  `-a no_earnings=True`
 
 ### Armazenamento de dados:
 Os dados extraídos são armazenados em arquivos CSV na pasta `scraped_data`. Para alterar o diretório de armazenamento edite `FILES_STORAGE_FOLDER` e/ou `FILES_STORAGE_PATH` dentro do arquivo `settings.py`.
 
 ### Formato dos dados:
-Os dados não sofrem alteração e são armazenados integralmente como são disponibilizados pela plataforma da Infomoney. A estrutura colunar dos dados no CSV é a seguinte:
+Os dados não sofrem alteração e são armazenados integralmente como são disponibilizados pela plataforma da Infomoney.
 
-**`DATA | TIMESTAMP (em formato Posix Time) | Abertura | Máxima | Mínima | Fechamento | Volume | Variação`**
+A estrutura colunar dos dados no CSV é a seguinte:
+
+- Histórico de Preço
+
+**`Data | Timestamp (POSIX Time) | Abertura | Máxima | Mínima | Fechamento | Volume | Variação`**
+
+- Histórico de Proventos
+
+**`Tipo | Valor | Data Aprovação | Data COM¹ | Data Pagamento | Situação`**
+
+*¹: Infomoney informa este dado como "DATA COM". Possivelmente equivalente a [Data Ex-Dividendos](https://pt.wikipedia.org/wiki/Ex-dividendos)*
+
 
 ## A Fazer
  - Extrair dados da página de proventos
