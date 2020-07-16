@@ -11,7 +11,6 @@ class InfomoneySpider(Spider):
     from Infomoney website.
 
     TODO:
-        - Scrape earnings page
         - Build static file with links to reduce the number of requests
         - Allow to refresh the static file
         - Check if the CSV file exists and allow for appends, replaces, etc
@@ -25,7 +24,7 @@ class InfomoneySpider(Spider):
     results_per_page = 1000
 
     def start_requests(self):
-        """Build initial request according to received args"""
+        """Build initial request(s)"""
         asset = getattr(self, 'asset', None)
         if asset:
             self.logger.info('Requesting data for single asset %s', asset)
@@ -82,12 +81,14 @@ class InfomoneySpider(Spider):
             callback=self.parse_historic_page,
             cb_kwargs={'code': code}
         )
-        # Not implemented
-        # yield Request(
-        #    url=response.urljoin('proventos/'),
-        #    callback=self.parse_earnings_page,
-        #    cb_kwargs={'code': code}
-        # )
+
+        escape_earnings = getattr(self, 'no_earnings', None) == 'True'
+        if not escape_earnings:
+            yield Request(
+                url=response.urljoin('proventos/'),
+                callback=self.parse_earnings_page,
+                cb_kwargs={'code': code}
+            )
 
     def parse_historic_page(self, response, code):
         """Parse historic page, yields requests for the price data"""
@@ -127,7 +128,7 @@ class InfomoneySpider(Spider):
             return
 
         if not results:
-            self.logger.warning('Data for asset %s returned empty.', code)
+            self.logger.warning('Price data for %s returned empty.', code)
             return
 
         start_arg = getattr(self, 'start_date', None)
@@ -135,14 +136,14 @@ class InfomoneySpider(Spider):
         if start_arg or end_arg:
             start_arg = start_arg.replace('/', '-') if start_arg else None
             end_arg = end_arg.replace('/', '-') if end_arg else None
-            filename = 'custom_date_{code}_{start_arg}_to_{end_arg}.csv'
+            filename = f'custom_date_{code}_{start_arg}_to_{end_arg}.csv'
         else:
             filename = f'{code}.csv'
 
         download_dir = self.settings.get('FILES_STORAGE_PATH')
         filename = os.path.join(download_dir, filename)
 
-        with open(filename, 'wt') as f:
+        with open(filename, 'wt+') as f:
             csvwriter = csv.writer(f, lineterminator="\n")
             for row in results:
                 date = row[0].get('display')
@@ -167,13 +168,52 @@ class InfomoneySpider(Spider):
         self.logger.info('%s price data saved on %s', code, filename)
 
     def parse_earnings_page(self, response, code):
-        """Parse earnings page, yields requests for the price data"""
-        self.logger.error('Not implemented yet.')
-        pass
+        """Parse earnings page, yields requests for the earnings data"""
+        nonce = response.xpath('//script').re_first(
+            r'quotes_earnings_nonce":"(\w+)"'
+        )
+        form = {
+            'symbol': code,
+            'quotes_earnings_nonce': nonce,
+            'page': '0',
+            'type': 'Todos',
+            'action': 'more_quotes_earnings',
+            'perPage': '100'
+        }
+
+        yield FormRequest(
+            url=self.api_url,
+            formdata=form,
+            callback=self.parse_earnings_data,
+            cb_kwargs={
+                'code': code
+            },
+            dont_filter=True,
+        )
 
     def parse_earnings_data(self, response, code):
-        """Parse JSON with historical price data into CSV."""
-        pass
+        """Parse JSON with earnings data into CSV."""
+        results = json.loads(response.body).get('aaData', False)
+
+        if isinstance(results, bool):
+            self.logger.error(
+                'Server failed in returning the earnings data for %s', code
+            )
+            return
+
+        if not results:
+            self.logger.warning('Earnings data for %s returned empty.', code)
+            return
+
+        filename = f'earnings_{code}.csv'
+        download_dir = self.settings.get('FILES_STORAGE_PATH')
+        filename = os.path.join(download_dir, filename)
+
+        with open(filename, 'wt') as f:
+            csvwriter = csv.writer(f, lineterminator="\n")
+            for row in results:
+                csvwriter.writerow(row)
+        self.logger.info('%s earnings data saved on %s', code, filename)
 
     def _build_asset_list_request(self, nonce, page=1):
         """Builds request for asset list page"""
