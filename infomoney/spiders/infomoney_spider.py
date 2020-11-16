@@ -1,21 +1,15 @@
-import csv
 import json
-import os
 from datetime import datetime, timedelta
 
 from scrapy import FormRequest, Request, Spider
+
+from infomoney.items import AssetEarningsItem, AssetPriceItem
+from infomoney.loaders import AssetEarningsLoader, AssetPriceLoader
 
 
 class InfomoneySpider(Spider):
     """Spider designed to retrieve historical price data of Brazilian stocks
     from Infomoney website.
-
-    TODO:
-        - Build static file with links to reduce the number of requests
-        - Allow to refresh the static file
-        - Check if the CSV file exists and allow for appends, replaces, etc
-        - Build pipeline for inserting data into DB
-        - Tests
     """
     name = "infomoney"
     start_url = 'https://www.infomoney.com.br/ferramentas/altas-e-baixas/'
@@ -41,10 +35,9 @@ class InfomoneySpider(Spider):
 
     def parse(self, response):
         """Parse initial page"""
-        nonce = response.xpath('//script').re(
+        nonce = response.xpath('//script').re_first(
             r'altas_e_baixas_table_nonce":"(\w+)",'
-        )[0]
-
+        )
         yield self._build_asset_list_request(nonce)
 
     def parse_asset_list(self, response, page):
@@ -75,12 +68,21 @@ class InfomoneySpider(Spider):
                 'No redirect from asset code %s. Page returned 404.', code
             )
             return
+        if response.url.endswith('.png'):  # Some assets redirects to an image
+            self.logger.error(
+                'Details page for %s can\'t be parsed. URL: %s',
+                code,
+                response.url
+            )
+            return
 
-        yield Request(
-            url=response.urljoin('historico/'),
-            callback=self.parse_historic_page,
-            cb_kwargs={'code': code}
-        )
+        escape_price = getattr(self, 'no_price', None) == 'True'
+        if not escape_price:
+            yield Request(
+                url=response.urljoin('historico/'),
+                callback=self.parse_historic_page,
+                cb_kwargs={'code': code}
+            )
 
         escape_earnings = getattr(self, 'no_earnings', None) == 'True'
         if not escape_earnings:
@@ -119,53 +121,29 @@ class InfomoneySpider(Spider):
     def parse_historical_data(self, response, code):
         """Parse JSON with historical price data into CSV."""
         results = json.loads(response.body)
-
         if isinstance(results, bool):
             self.logger.error(
                 'Server failed in returning the historical price data for %s',
                 code
             )
             return
-
         if not results:
             self.logger.warning('Price data for %s returned empty.', code)
             return
 
-        start_arg = getattr(self, 'start_date', None)
-        end_arg = getattr(self, 'end_date', None)
-        if start_arg or end_arg:
-            start_arg = start_arg.replace('/', '-') if start_arg else None
-            end_arg = end_arg.replace('/', '-') if end_arg else None
-            filename = f'custom_date_{code}_{start_arg}_to_{end_arg}.csv'
-        else:
-            filename = f'{code}.csv'
-
-        download_dir = self.settings.get('FILES_STORAGE_PATH')
-        filename = os.path.join(download_dir, filename)
-
-        with open(filename, 'wt+') as f:
-            csvwriter = csv.writer(f, lineterminator="\n")
-            for row in results:
-                date = row[0].get('display')
-                timestamp = row[0].get('timestamp')
-                _open = row[1]
-                close = row[2]
-                variation = row[3]
-                low = row[4]
-                high = row[5]
-                volume = row[6]
-                new_row = [
-                    date,
-                    timestamp,
-                    _open,
-                    high,
-                    low,
-                    close,
-                    volume,
-                    variation
-                ]
-                csvwriter.writerow(new_row)
-        self.logger.info('%s price data saved on %s', code, filename)
+        for row in results:
+            loader = AssetPriceLoader(item=AssetPriceItem())
+            loader.add_value('asset_code', code)
+            loader.add_value('date', row[0].get('display'))
+            loader.add_value('timestamp', row[0].get('timestamp'))
+            loader.add_value('open', row[1])
+            loader.add_value('high', row[5])
+            loader.add_value('low', row[4])
+            loader.add_value('close', row[2])
+            loader.add_value('volume', row[6])
+            loader.add_value('variation', row[3])
+            item = loader.load_item()
+            yield item
 
     def parse_earnings_page(self, response, code):
         """Parse earnings page, yields requests for the earnings data"""
@@ -176,7 +154,7 @@ class InfomoneySpider(Spider):
             'symbol': code,
             'quotes_earnings_nonce': nonce,
             'page': '0',
-            'type': 'Todos',
+            'type': 'null',
             'action': 'more_quotes_earnings',
             'perPage': '100'
         }
@@ -193,27 +171,29 @@ class InfomoneySpider(Spider):
 
     def parse_earnings_data(self, response, code):
         """Parse JSON with earnings data into CSV."""
-        results = json.loads(response.body).get('aaData', False)
-
+        results = json.loads(response.body)
         if isinstance(results, bool):
             self.logger.error(
                 'Server failed in returning the earnings data for %s', code
             )
             return
-
-        if not results:
-            self.logger.warning('Earnings data for %s returned empty.', code)
+        if not results.get('aaData'):
+            self.logger.info('Earnings data for %s returned empty.', code)
             return
 
-        filename = f'earnings_{code}.csv'
-        download_dir = self.settings.get('FILES_STORAGE_PATH')
-        filename = os.path.join(download_dir, filename)
-
-        with open(filename, 'wt') as f:
-            csvwriter = csv.writer(f, lineterminator="\n")
-            for row in results:
-                csvwriter.writerow(row)
-        self.logger.info('%s earnings data saved on %s', code, filename)
+        results = results.get('aaData')
+        for row in results:
+            loader = AssetEarningsLoader(item=AssetEarningsItem())
+            loader.add_value('asset_code', code)
+            loader.add_value('type', row[0])
+            loader.add_value('value', row[1])
+            loader.add_value('pct_factor', row[2])
+            loader.add_value('emission_value', row[3])
+            loader.add_value('date_of_approval', row[4])
+            loader.add_value('date_of_record', row[5])
+            loader.add_value('date_of_payment', row[6])
+            item = loader.load_item()
+            yield item
 
     def _build_asset_list_request(self, nonce, page=1):
         """Builds request for asset list page"""
