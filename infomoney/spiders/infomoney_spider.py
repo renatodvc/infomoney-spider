@@ -68,7 +68,8 @@ class InfomoneySpider(Spider):
                 'No redirect from asset code %s. Page returned 404.', code
             )
             return
-        if response.url.endswith('.png'):  # Some assets redirects to an image
+        if response.url.endswith('.png') or response.url.endswith('.gif'):
+            # A few assets links are redirecting to images (USIM3, HAGA4, etc)
             self.logger.error(
                 'Details page for %s can\'t be parsed. URL: %s',
                 code,

@@ -11,9 +11,11 @@ $ pip install -r requirements.txt
 ```
 *Infomoney-spider requer Python 3.6+*
 
-Se você pretende usar um banco de dados SQL para armazenar os dados, preencha o campo `DATABASE_URI` dentro de `settings.py` com as informações de conexão com o banco. (*O projeto usa a ORM do [SQLAlchemy](https://www.sqlalchemy.org/), verifique os [DBs suportados](https://docs.sqlalchemy.org/en/13/dialects/index.html)*).
+Se você pretende usar um banco de dados SQL para armazenar os dados:
+- Preencha o campo `DATABASE_URI` dentro de `settings.py` com as informações de conexão com o banco. 
+	- *O projeto usa a ORM do [SQLAlchemy](https://www.sqlalchemy.org/), verifique os [DBs suportados](https://docs.sqlalchemy.org/en/13/dialects/index.html)*.
 
-Após preencher as o campo mencionado, **execute as migrações**:
+- Após preencher o campo `DATABASE_URI`, **execute as migrações**:
 ```sh
 $ alembic upgrade head
 ```
@@ -62,7 +64,7 @@ A estrutura colunar dos dados na fonte seguem os seguintes padrões:
 
 
 ## A Fazer
- - Incluir testes
+ - Incluir testes.
  - Permitir operação de incrementar o CSV ao invés de sobrescrever.
 
 ## Licença
