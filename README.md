@@ -1,7 +1,7 @@
 # INFOMONEY-SPIDER 
-*This project is a web crawler developed with Scrapy for scraping historical price data of Brazilian Stocks from [Infomoney](https://www.infomoney.com.br/) website.*
+*Infomoney-spider is a web crawler developed with Scrapy for scraping historical price data of Brazilian Stocks from [Infomoney](https://www.infomoney.com.br/) website. Infomoney provides daily price data (OHLCV) and earnings data for more than 500 assets.
 
-Infomoney-spider é um web crawler desenvolvido com [Scrapy](https://scrapy.org/) para extração dos dados históricos de preço dos ativos da B3 disponibilizados na página [Infomoney](https://www.infomoney.com.br/). A Infomoney disponibiliza dados de preço diário (OHLCV) e dados de proventos para mais de 500 ativos. :brazil:
+Infomoney-spider é um web crawler desenvolvido com [Scrapy](https://scrapy.org/) para extração dos dados históricos de preço dos ativos da B3 disponibilizados na página [Infomoney](https://www.infomoney.com.br/). A Infomoney disponibiliza dados de preço diário (OHLCV) e dados de proventos para mais de 700 ativos. [Leia-me em português :brazil:](instalando)
 
 ## Instalando
 Clone o repositório e instale as dependências.
@@ -31,7 +31,7 @@ $ scrapy crawl infomoney [-a param=value]
 * **end_date**: Busca os dados históricos até a data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada será utilizado o dia da execução. Ex: `-a end_date=01/01/2020`
 * **no_earnings**: Se `True` o spider não fará coleta dos dados de proventos (JSCP, dividendos, etc). Se não informado a coleta é realizada automaticamente. Ex: `-a no_earnings=True`
 * **no_price**: Se `True` o spider não fará coleta dos dados de preço (Abertura, Máxima, Fechamento, etc). Se não informado a coleta é realizada automaticamente. Ex: `-a no_price=True`
-* **force**: Se `True` o spider atualizará os registros já existentes no banco de dados com as novas informações obtidas. Se não informado registros que já constam no banco de dados serão ignorados. **AFETA APENAS BANCO DE DADOS SQL**. Ex: `-a no_price=True`
+* **force**: Se `True` o spider atualizará os registros já existentes no banco de dados com as novas informações obtidas. Se não informado registros que já constam no banco de dados serão ignorados. **AFETA APENAS BANCO DE DADOS SQL**. Ex: `-a force=True`
 
 ### Pipelines:
 Por padrão ambos os pipelines `SplitInCSVsPipeline` e `StoreInDatabasePipeline` estão ativados, você pode alterar isto comentando suas linhas no arquivo `settings.py`.
