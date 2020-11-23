@@ -81,7 +81,7 @@ class StoreInDatabasePipeline:
             self.session.commit()
         except SQLAlchemyError:
             self.session.rollback()
-            self.logger.exception('Failed to insert record in the database.')
+            self.logger.exception('Failed to commit the database transaction.')
 
         return item
 
@@ -107,7 +107,7 @@ class StoreInDatabasePipeline:
             'high': Decimal(record['high']),
             'low': Decimal(record['low']),
             'close': Decimal(record['close']),
-            'variation': Decimal(item['variation']),
+            'variation': Decimal(record['variation']),
         })
 
         if not record_exist:
@@ -127,7 +127,7 @@ class StoreInDatabasePipeline:
             self.session.commit()
         except SQLAlchemyError:
             self.session.rollback()
-            self.logger.exception('Failed to insert record in the database.')
+            self.logger.exception('Failed to commit the database transaction.')
 
         return item
 
