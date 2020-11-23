@@ -81,7 +81,7 @@ $ pip install -r requirements.txt
 *Infomoney-spider requires Python 3.6+*
 
 If you plan to use a SQL database to store the data:
-- Fill in the `DATABASE_URI` field within` settings.py` with your DB connection information.
+- Fill in the `DATABASE_URI` field within `settings.py` with your DB connection information.
 	- *The project uses [SQLAlchemy](https://www.sqlalchemy.org/) ORM, check the [supported DBs](https://docs.sqlalchemy.org/en/13/dialects/index.html)*.
 
 - After filling in the `DATABASE_URI` field, **execute the migrations**:
