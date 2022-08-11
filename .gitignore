@@ -130,3 +130,6 @@ dmypy.json
 
 # SQLite db
 *.db
+
+# Output folder for CSV
+csv_output/
