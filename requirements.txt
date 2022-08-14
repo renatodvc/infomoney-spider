@@ -45,7 +45,7 @@ constantly==15.1.0
     # via
     #   -r requirements.in
     #   twisted
-cryptography==2.9.2
+cryptography==3.3.2
     # via
     #   -r requirements.in
     #   pyopenssl
