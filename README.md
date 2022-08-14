@@ -38,7 +38,7 @@ $ scrapy crawl infomoney [-a param=value]
 ### Pipelines:
 Por padrão ambos os pipelines `SplitInCSVsPipeline` e `StoreInDatabasePipeline` estão ativados, você pode alterar isto comentando suas linhas no arquivo `settings.py`.
 
-- **SplitInCSVsPipeline**: Os dados extraídos são armazenados em arquivos CSV na pasta `scraped_data`. Para alterar o diretório de armazenamento edite `FILES_STORAGE_FOLDER` e/ou `FILES_STORAGE_PATH` dentro do arquivo `settings.py`. Os dados de cada ativo são armazenados em arquivos diferentes, dados de proventos também são separados dos dados de preços.
+- **SplitInCSVsPipeline**: Os dados extraídos são armazenados em arquivos CSV na pasta `csv_output`. Para alterar o diretório de armazenamento edite `FILES_STORAGE_FOLDER` e/ou `FILES_STORAGE_PATH` dentro do arquivo `settings.py`. Os dados de cada ativo são armazenados em arquivos diferentes, dados de proventos também são separados dos dados de preços.
 
 - **StoreInDatabasePipeline**: Se nenhuma informação de conexão com o banco de dados for incluída no campo `DATABASE_URI` do `settings.py`, essa pipeline se desativará automaticamente. A pipeline utiliza da ORM do [SQLAlchemy](https://www.sqlalchemy.org/), para suportar diferentes opções de banco de dados, [veja quais são eles](https://docs.sqlalchemy.org/en/13/dialects/index.html). Quando ativa, os dados de preço e proventos serão armazenados nas tabelas `assets_earnings` e `assets_prices` respectivamente. 
 
@@ -107,7 +107,7 @@ $ scrapy crawl infomoney [-a param=value]
 ### Pipelines:
 By default, both the `SplitInCSVsPipeline` and `StoreInDatabasePipeline` pipelines are enabled, you can change this by commenting out their lines in the `settings.py` file.
 
-- **SplitInCSVsPipeline**: The extracted data is stored in CSV files in the `scraped_data` folder. To change the storage directory, edit `FILES_STORAGE_FOLDER` and/or `FILES_STORAGE_PATH` inside the `settings.py` file. The data for each asset is stored in a different file, earnings data are also separated from the price data.
+- **SplitInCSVsPipeline**: The extracted data is stored in CSV files in the `csv_output` folder. To change the storage directory, edit `FILES_STORAGE_FOLDER` and/or `FILES_STORAGE_PATH` inside the `settings.py` file. The data for each asset is stored in a different file, earnings data are also separated from the price data.
 
 - **StoreInDatabasePipeline**: If no database connection information is included in the `DATABASE_URI` field of `settings.py`, this pipeline will be disabled automatically. The pipeline uses the [SQLAlchemy](https://www.sqlalchemy.org/) ORM, to support multiple database options, [see what they are](https://docs.sqlalchemy.org/en/13/dialects/index.html). When activated, the price and earnings data will be stored in the `assets_earnings` and `assets_prices` tables respectively.
 

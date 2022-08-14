@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 from scrapy import FormRequest, Request, Spider
+from scrapy.downloadermiddlewares.retry import get_retry_request
 
 from infomoney.items import AssetEarningsItem, AssetPriceItem
 from infomoney.loaders import AssetEarningsLoader, AssetPriceLoader
@@ -95,6 +96,12 @@ class InfomoneySpider(Spider):
 
     def parse_historic_page(self, response, code):
         """Parse historic page, yields requests for the price data"""
+        if '/fii/' in response.url:
+            self.logger.warning(
+                'Historic page for FII are not supported yet: %s', response.url
+            )
+            return
+
         nonce = response.xpath('//script').re_first(
             r'quotes_history_nonce":"(\w+)"'
         )
@@ -148,9 +155,20 @@ class InfomoneySpider(Spider):
 
     def parse_earnings_page(self, response, code):
         """Parse earnings page, yields requests for the earnings data"""
+        if '/fii/' in response.url:
+            self.logger.warning(
+                'Earnigns page for FII are not supported yet: %s', response.url
+            )
+            return
+
         nonce = response.xpath('//script').re_first(
             r'quotes_earnings_nonce":"(\w+)"'
         )
+        if not nonce:
+            return get_retry_request(
+                response.request, spider=self, reason='Malformed response'
+            )
+
         form = {
             'symbol': code,
             'quotes_earnings_nonce': nonce,
@@ -173,11 +191,14 @@ class InfomoneySpider(Spider):
     def parse_earnings_data(self, response, code):
         """Parse JSON with earnings data into CSV."""
         results = json.loads(response.body)
-        if isinstance(results, bool):
-            self.logger.error(
+        if isinstance(results, bool) or isinstance(results, int):
+            self.logger.warning(
                 'Server failed in returning the earnings data for %s', code
             )
-            return
+            return get_retry_request(
+                response.request, spider=self, reason='Malformed response'
+            )
+
         if not results.get('aaData'):
             self.logger.info('Earnings data for %s returned empty.', code)
             return
