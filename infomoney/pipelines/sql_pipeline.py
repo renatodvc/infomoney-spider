@@ -4,7 +4,7 @@ import hashlib
 import logging
 
 from scrapy.exceptions import NotConfigured
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, StatementError
 from sqlalchemy.orm import scoped_session
 
 from infomoney.models import (
@@ -28,9 +28,9 @@ class StoreInDatabasePipeline:
     def process_item(self, item, spider):
         force = getattr(spider, 'force', None) == 'True'
         if isinstance(item, AssetPriceItem):
-            return self._process_price_item(item, force)
+            return self._process_price_item(item, force, spider)
         elif isinstance(item, AssetEarningsItem):
-            return self._process_earnings_item(item, force)
+            return self._process_earnings_item(item, force, spider)
         else:
             return item
 
@@ -38,7 +38,7 @@ class StoreInDatabasePipeline:
         self.session.close()
         self.logger.debug('Closed database session.')
 
-    def _process_earnings_item(self, item, force_update):
+    def _process_earnings_item(self, item, force_update, spider):
         """Process an instance of the AssetEarningsItem into the data types the
         model expects and inserts into the DB.
         :param item: Item containing the data to be processed.
@@ -47,7 +47,8 @@ class StoreInDatabasePipeline:
         :type force_update: bool
         """
         base_string = (
-            f'{item["asset_code"]}{item["type"]}{item["date_of_approval"]}'
+            f'{item["asset_code"]}{item["type"]}'
+            f'{item.get("date_of_approval") or item.get("date_of_payment")}'
         )
         _id = self._build_hash_id(base_string)
 
@@ -56,12 +57,14 @@ class StoreInDatabasePipeline:
         record_exist = query.first()
         record = item.copy()  # Keeping the original item through the pipelines
         record.update({
-            'value': Decimal(record['value']),
-            'pct_factor': Decimal(record['pct_factor']),
-            'emission_value': Decimal(record['emission_value']),
-            'date_of_approval': self._parse_date(record['date_of_approval']),
-            'date_of_record': self._parse_date(record['date_of_record']),
-            'date_of_payment': self._parse_date(record['date_of_payment']),
+            'value': self._convert_to_decimal(record.get('value')),
+            'pct_factor': self._convert_to_decimal(record.get('pct_factor')),
+            'emission_value': self._convert_to_decimal(
+                record.get('emission_value')
+            ),
+            'date_of_approval': record.get('date_of_approval'),
+            'date_of_record': record.get('date_of_record'),
+            'date_of_payment': record.get('date_of_payment'),
         })
 
         if not record_exist:
@@ -75,17 +78,20 @@ class StoreInDatabasePipeline:
             self.logger.debug(
                 'Record "%s" already exists in the database, dropping...', _id
             )
+            spider.crawler.stats.inc_value(
+                f'dropped/sql/earnings/duplicated/{item["asset_code"]}'
+            )
             return item
 
         try:
             self.session.commit()
-        except SQLAlchemyError:
+        except (SQLAlchemyError, StatementError):
             self.session.rollback()
             self.logger.exception('Failed to commit the database transaction.')
 
         return item
 
-    def _process_price_item(self, item, force_update):
+    def _process_price_item(self, item, force_update, spider):
         """Process an instance of the AssetPriceItem into the data types the
         model expects and inserts into the DB.
         :param item: Item containing the data to be processed.
@@ -93,7 +99,9 @@ class StoreInDatabasePipeline:
         :param force_update: Flag to force the records to be updated in the DB
         :type force_update: bool
         """
-        base_string = f'{item["asset_code"]}{item["timestamp"]}'
+        base_string = (
+            f'{item["asset_code"]}{item.get("timestamp") or item["date"]}'
+        )
         _id = self._build_hash_id(base_string)
 
         query = self.session.query(AssetPriceModel) \
@@ -101,13 +109,13 @@ class StoreInDatabasePipeline:
         record_exist = query.first()
         record = item.copy()  # Keeping the original item through the pipelines
         record.update({
-            'date': self._parse_date(record['date']),
-            'timestamp': self._parse_timestamp(record['timestamp']),
-            'open': Decimal(record['open']),
-            'high': Decimal(record['high']),
-            'low': Decimal(record['low']),
-            'close': Decimal(record['close']),
-            'variation': Decimal(record['variation']),
+            'date': record['date'],
+            'timestamp': self._parse_timestamp(record.get('timestamp')),
+            'open': self._convert_to_decimal(record.get('open')),
+            'high': self._convert_to_decimal(record.get('high')),
+            'low': self._convert_to_decimal(record.get('low')),
+            'close': self._convert_to_decimal(record.get('close')),
+            'variation': self._convert_to_decimal(record.get('variation')),
         })
 
         if not record_exist:
@@ -121,11 +129,14 @@ class StoreInDatabasePipeline:
             self.logger.debug(
                 'Record "%s" already exists in the database, dropping...', _id
             )
+            spider.crawler.stats.inc_value(
+                f'dropped/sql/price/duplicated/{item["asset_code"]}'
+            )
             return item
 
         try:
             self.session.commit()
-        except SQLAlchemyError:
+        except (SQLAlchemyError, StatementError):
             self.session.rollback()
             self.logger.exception('Failed to commit the database transaction.')
 
@@ -136,15 +147,9 @@ class StoreInDatabasePipeline:
         base_string = bytes(base_string, encoding='utf-8')
         return hashlib.md5(base_string).hexdigest()
 
-    def _parse_date(self, date):
-        # Date will always store time as 00:00:00
-        if date == 'n/d':
-            return
-        try:
-            return datetime.strptime(date, '%d/%m/%Y')
-        except ValueError:
-            return datetime.strptime(date, '%d/%m/%y')
+    def _convert_to_decimal(self, value):
+        return Decimal(value) if value else None
 
     def _parse_timestamp(self, timestamp):
         # Timestamp includes timing, but unrelated to market close.
-        return datetime.fromtimestamp(int(timestamp))
+        return datetime.fromtimestamp(int(timestamp)) if timestamp else None

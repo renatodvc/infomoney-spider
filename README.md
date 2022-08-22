@@ -28,8 +28,8 @@ $ scrapy crawl infomoney [-a param=value]
 
 ### Parâmetros aceitos:
 *Todos os parâmetros são opcionais.*
-- **asset**: Código do ativo na B3. Se nenhum ativo for informado o spider fará requisições para todos os ativos disponíveis na [lista de cotações da Infomoney](https://www.infomoney.com.br/ferramentas/altas-e-baixas/). Ex: `-a asset=PETR4`
-- **start_date**: Busca os dados históricos a partir da data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada a requisição será feita para o período máximo disponível (2 anos). Ex: `-a start_date=01/01/2019`
+- **assets**: Código dos ativos na B3, aceita múltiplos ativos separados por virgúla. Se nenhum ativo for informado o spider fará requisições para todos os ativos disponíveis na [lista de cotações da Infomoney](https://www.infomoney.com.br/ferramentas/altas-e-baixas/). Ex: `-a assets=PETR4,PETR3`
+- **start_date**: Busca os dados históricos a partir da data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada a requisição será feita para o período máximo disponível (2 anos para ações, FIIs podem ter um período mais longo disponível). Ex: `-a start_date=01/01/2019`
 - **end_date**: Busca os dados históricos até a data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada será utilizado o dia da execução. Ex: `-a end_date=01/01/2020`
 - **no_earnings**: Se `True` o spider não fará coleta dos dados de proventos (JSCP, dividendos, etc). Se não informado a coleta é realizada automaticamente. Ex: `-a no_earnings=True`
 - **no_price**: Se `True` o spider não fará coleta dos dados de preço (Abertura, Máxima, Fechamento, etc). Se não informado a coleta é realizada automaticamente. Ex: `-a no_price=True`
@@ -69,6 +69,7 @@ A estrutura colunar dos dados na fonte seguem os seguintes padrões:
 ## Licença
 [MIT](https://github.com/renatodvc/infomoney-spider/blob/master/LICENSE)
 
+
 ---
  ![](https://github.githubassets.com/images/icons/emoji/unicode/1f1ec-1f1e7.png?v8) ![](https://github.githubassets.com/images/icons/emoji/unicode/1f1fa-1f1f8.png?v8)
 
@@ -97,8 +98,8 @@ $ scrapy crawl infomoney [-a param=value]
 
 ### Accepted parameters:
 *All parameters are optional.*
-- **asset**: Asset code in B3 (Brazillian stock exchange). If no asset is informed, the spider will make requests for all assets available in the [Infomoney's asset list](https://www.infomoney.com.br/ferramentas/altas-e-baixas/). Ex: `-a asset=PETR4`
-- **start_date**: Search the historical data starting from the informed date (use *dd/mm/yyyy* format). If no date is given, the request will be made for the maximum available period (2 years). Ex: `-a start_date=01/01/2019`
+- **assets**: Assets code in B3 (Brazillian stock exchange), accepts multiple assets separated by a comma. If no asset is informed, the spider will make requests for all assets available in the [Infomoney's asset list](https://www.infomoney.com.br/ferramentas/altas-e-baixas/). Ex: `-a assets=PETR4,PETR3`
+- **start_date**: Search the historical data starting from the informed date (use *dd/mm/yyyy* format). If no date is given, the request will be made for the maximum available period (2 years for stocks, REITs may have longer period available). Ex: `-a start_date=01/01/2019`
 - **end_date**: Search historical data up to the given date (use *dd/mm/yyyy* format). If no date is given, the current day will be used. Ex: `-a end_date=01/01/2020`
 - **no_earnings**: If `True` the spider will not collect the earnings data. If not informed, scraping is performed automatically. Ex: `-a no_earnings=True`
 - **no_price**: If `True` the spider will not collect the price data (Open, High, Close ...). If not informed, scraping is performed automatically. Ex: `-a no_price=True`

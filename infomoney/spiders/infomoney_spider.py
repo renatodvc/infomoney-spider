@@ -3,62 +3,89 @@ from datetime import datetime, timedelta
 
 from scrapy import FormRequest, Request, Spider
 from scrapy.downloadermiddlewares.retry import get_retry_request
+from w3lib.url import add_or_replace_parameter
 
 from infomoney.items import AssetEarningsItem, AssetPriceItem
 from infomoney.loaders import AssetEarningsLoader, AssetPriceLoader
 
 
 class InfomoneySpider(Spider):
-    """Spider designed to retrieve historical price data of Brazilian stocks
-    from Infomoney website.
+    """Spider designed to retrieve historical price and earnings data of
+    Brazilian stocks from Infomoney website.
     """
-    name = "infomoney"
-    start_url = 'https://www.infomoney.com.br/ferramentas/altas-e-baixas/'
-    api_url = 'https://www.infomoney.com.br/wp-admin/admin-ajax.php'
+    name = 'infomoney'
+    results_per_page = 500
+
+    # API URLs
     base_details_url = 'https://www.infomoney.com.br/{asset_code}'
-    results_per_page = 1000
+    start_url = (
+        'https://api.infomoney.com.br/markets/high-low/b3?sector=Todos&order'
+        'Atributte=Volume&pageIndex={page}&pageSize={size}&search=&type=json'
+    )
+    fii_earnings_api = (
+        'https://fii-api.infomoney.com.br/api/v1/fii/provento/'
+        'historico?Ticker={asset_code}'
+    )
+    fii_price_api = (
+        'https://fii-api.infomoney.com.br/api/v1/fii/cotacao/historico/'
+        'grafico?Ticker={asset_code}'
+    )
+    earnings_api = (
+        'https://www.infomoney.com.br/wp-json/infomoney/v1/quotes/earnings'
+    )
+    price_api = (
+        'https://www.infomoney.com.br/wp-json/infomoney/v1/quotes/history'
+    )
+
+    # Broken URLs that redirect to wrong pages
+    broken_asset_urls = {
+        'BRPR3': 'https://www.infomoney.com.br/cotacoes/b3/acao/br-properties-brpr3/', # noqa E501
+        'FRAS3': 'https://www.infomoney.com.br/cotacoes/b3/acao/fras-le-fras3/',  # noqa E501
+        'HAGA4': 'https://www.infomoney.com.br/cotacoes/b3/acao/haga-haga4/',
+        'ROMI3': 'https://www.infomoney.com.br/cotacoes/b3/acao/inds-romi-romi3/',  # noqa E501
+        'TELB4': 'https://www.infomoney.com.br/cotacoes/b3/acao/telebras-telb4/',  # noqa E501
+        'TPIS3': 'https://www.infomoney.com.br/cotacoes/b3/acao/triunfo-part-tpis3/',  # noqa E501
+        'USIM3': 'https://www.infomoney.com.br/cotacoes/b3/acao/usiminas-usim3/',  # noqa E501
+    }
 
     def start_requests(self):
         """Build initial request(s)"""
-        asset = getattr(self, 'asset', None)
-        if asset:
-            self.logger.info('Requesting data for single asset %s', asset)
-            yield Request(
-                url=self.base_details_url.format(asset_code=asset),
-                callback=self.parse_details_page,
-                cb_kwargs={
-                    'code': asset,
-                }
-            )
+        assets = getattr(self, 'assets', None)
+        if assets:
+            self.logger.info('Requesting data for asset(s): %s', assets)
+            for asset in assets.split(','):
+                yield Request(
+                    url=self.base_details_url.format(asset_code=asset),
+                    callback=self.parse_details_page,
+                    cb_kwargs={
+                        'code': asset,
+                    }
+                )
         else:
             self.logger.info('Requesting data for ALL available assets.')
-            yield Request(url=self.start_url, callback=self.parse)
+            yield Request(
+                url=self.start_url.format(page=1, size=self.results_per_page),
+                callback=self.parse
+            )
 
     def parse(self, response):
         """Parse initial page"""
-        nonce = response.xpath('//script').re_first(
-            r'altas_e_baixas_table_nonce":"(\w+)",'
-        )
-        yield self._build_asset_list_request(nonce)
-
-    def parse_asset_list(self, response, page):
-        """Parse asset list page, yields requests for details page for every
-        asset available.
-        """
-        result = json.loads(response.body)
-        if result['iTotalRecords'] >= self.results_per_page:
-            next_page = page + 1
-            nonce = response.meta.get('nonce')
-            yield self._build_asset_list_request(nonce, next_page)
-
-        for asset in result.get('aaData'):
-            code = asset[1]
+        data = response.json()
+        for asset in data.get('Data'):
+            code = asset.get('StockCode')
             yield Request(
                 url=self.base_details_url.format(asset_code=code),
                 callback=self.parse_details_page,
-                cb_kwargs={
-                    'code': code
-                },
+                cb_kwargs={'code': code},
+            )
+
+        if data.get('PageIndex') < data.get('TotalPages'):
+            yield Request(
+                url=self.start_url.format(
+                    page=data.get('PageIndex') + 1,
+                    size=self.results_per_page
+                ),
+                callback=self.parse
             )
 
     def parse_details_page(self, response, code):
@@ -71,75 +98,141 @@ class InfomoneySpider(Spider):
             return
         if response.url.endswith('.png') or response.url.endswith('.gif'):
             # A few assets links are redirecting to images (USIM3, HAGA4, etc)
+            if code in self.broken_asset_urls:
+                yield Request(
+                    url=self.broken_asset_urls[code],
+                    callback=self.parse_details_page,
+                    cb_kwargs={'code': code}
+                )
+                return
             self.logger.error(
-                'Details page for %s can\'t be parsed. URL: %s',
-                code,
-                response.url
+                'Details page for %s returned an unexpected response. URL: %s',
+                code, response.url
             )
             return
 
-        escape_price = getattr(self, 'no_price', None) == 'True'
-        if not escape_price:
-            yield Request(
-                url=response.urljoin('historico/'),
-                callback=self.parse_historic_page,
-                cb_kwargs={'code': code}
+        if not getattr(self, 'no_price', None) == 'True':
+            yield self._make_price_request(response, code)
+        if not getattr(self, 'no_earnings', None) == 'True':
+            yield self._make_earnings_request(response, code)
+
+    def _make_earnings_request(self, response, code):
+        # FIIs have a different endpoint from other assets
+        if 'b3/fii/' in response.url:
+            url = self.fii_earnings_api.format(asset_code=code)
+            return Request(
+                url, callback=self.parse_fii_earnings, cb_kwargs={'code': code}
             )
 
-        escape_earnings = getattr(self, 'no_earnings', None) == 'True'
-        if not escape_earnings:
-            yield Request(
-                url=response.urljoin('proventos/'),
-                callback=self.parse_earnings_page,
-                cb_kwargs={'code': code}
-            )
-
-    def parse_historic_page(self, response, code):
-        """Parse historic page, yields requests for the price data"""
-        if '/fii/' in response.url:
-            self.logger.warning(
-                'Historic page for FII are not supported yet: %s', response.url
-            )
-            return
-
-        nonce = response.xpath('//script').re_first(
-            r'quotes_history_nonce":"(\w+)"'
-        )
-        start_date, end_date = self._get_date_attributes()
-
-        form = {
-            'symbol': code,
-            'quotes_history_nonce': nonce,
-            'numberItems': '99999',
-            'page': '0',
-            'action': 'more_quotes_history',
-            'initialDate': start_date,
-            'finalDate': end_date,
-        }
-        yield FormRequest(
-            url=self.api_url,
-            formdata=form,
-            callback=self.parse_historical_data,
-            cb_kwargs={
-                'code': code
+        return FormRequest(
+            url=self.earnings_api,
+            callback=self.parse_earnings_data,
+            cb_kwargs={'code': code},
+            formdata={
+                'symbol': code,
+                'type': 'null',
+                'page': '0',
+                'perPage': str(self.results_per_page),
             },
-            dont_filter=True,
         )
 
-    def parse_historical_data(self, response, code):
-        """Parse JSON with historical price data into CSV."""
-        results = json.loads(response.body)
-        if isinstance(results, bool):
-            self.logger.error(
-                'Server failed in returning the historical price data for %s',
-                code
+    def _make_price_request(self, response, code):
+        # FIIs have a different endpoint from other assets
+        if 'b3/fii/' in response.url:
+            url = self.fii_price_api.format(asset_code=code)
+            start_date, end_date = self._get_date_attributes(st_offset=365 * 5)
+            url = add_or_replace_parameter(
+                url, 'DataInicio', start_date.replace('/', '-')
             )
-            return
-        if not results:
-            self.logger.warning('Price data for %s returned empty.', code)
-            return
+            url = add_or_replace_parameter(
+                url, 'DataFim', end_date.replace('/', '-')
+            )
+            return Request(
+                url, callback=self.parse_fii_prices, cb_kwargs={'code': code}
+            )
 
-        for row in results:
+        start_date, end_date = '', ''
+        if getattr(self, 'start_date', None) or getattr(self, 'end_date', None):  # noqa E501
+            start_date, end_date = self._get_date_attributes()
+
+        return FormRequest(
+            url=self.price_api,
+            callback=self.parse_prices_data,
+            cb_kwargs={'code': code},
+            formdata={
+                'page': '0',
+                'numberItems': str(self.results_per_page),
+                'initialDate': start_date,
+                'finalDate': end_date,
+                'symbol': code,
+            },
+        )
+
+    def parse_fii_earnings(self, response, code):
+        """Parse JSON with FII earnings data into Item."""
+        data = self._is_data_valid(response, code, 'earnings')
+        if not data:
+            return get_retry_request(
+                response.request, spider=self, reason='Invalid response'
+            )
+
+        data = response.json()
+        for row in data:
+            loader = AssetEarningsLoader(item=AssetEarningsItem())
+            loader.add_value('asset_code', code)
+            loader.add_value('type', 'Rendimento')
+            loader.add_value('value', row['rendimento'])
+            loader.add_value('pct_factor', row['yield'])
+            loader.add_value('date_of_payment', row['data'])
+            item = loader.load_item()
+            yield item
+
+    def parse_fii_prices(self, response, code):
+        """Parse JSON with FII historical price data into Item."""
+        data = self._is_data_valid(response, code, 'prices', 'dataValor')
+        if not data:
+            return get_retry_request(
+                response.request, spider=self, reason='Invalid response'
+            )
+
+        for row in data['dataValor']:
+            loader = AssetPriceLoader(item=AssetPriceItem())
+            loader.add_value('asset_code', code)
+            loader.add_value('date', row.get('data'))
+            loader.add_value('close', row['valor'])
+            item = loader.load_item()
+            yield item
+
+    def parse_earnings_data(self, response, code):
+        """Parse JSON with earnings data into Item."""
+        data = self._is_data_valid(response, code, 'earnings', 'aaData')
+        if not data:
+            return get_retry_request(
+                response.request, spider=self, reason='Invalid response'
+            )
+
+        for row in data.get('aaData')[::-1]:
+            loader = AssetEarningsLoader(item=AssetEarningsItem())
+            loader.add_value('asset_code', code)
+            loader.add_value('type', row[0])
+            loader.add_value('value', row[1])
+            loader.add_value('pct_factor', row[2])
+            loader.add_value('emission_value', row[3])
+            loader.add_value('date_of_approval', row[4])
+            loader.add_value('date_of_record', row[5])
+            loader.add_value('date_of_payment', row[6])
+            item = loader.load_item()
+            yield item
+
+    def parse_prices_data(self, response, code):
+        """Parse JSON with historical price data into Item."""
+        data = self._is_data_valid(response, code, 'prices')
+        if not data:
+            return get_retry_request(
+                response.request, spider=self, reason='Invalid response'
+            )
+
+        for row in data[::-1]:
             loader = AssetPriceLoader(item=AssetPriceItem())
             loader.add_value('asset_code', code)
             loader.add_value('date', row[0].get('display'))
@@ -153,100 +246,60 @@ class InfomoneySpider(Spider):
             item = loader.load_item()
             yield item
 
-    def parse_earnings_page(self, response, code):
-        """Parse earnings page, yields requests for the earnings data"""
-        if '/fii/' in response.url:
+    def _is_data_valid(self, response, code, _type, *args):
+        """Checks if the response isn't empty or malformed.
+        :param response: Response to the request
+        :type response: Scrapy Response object.
+        :param code: Asset code for the request.
+        :type code: str
+        :param _type: Type of data expected from the response, used only for
+        logging purposes.
+        :type _type: str
+        :param *args: Keys that are expected in the response JSON.
+        :type *args: List[str]
+        """
+        if not response.body:
             self.logger.warning(
-                'Earnigns page for FII are not supported yet: %s', response.url
+                'Response for %s %s returned empty.', code, _type
             )
             return
 
-        nonce = response.xpath('//script').re_first(
-            r'quotes_earnings_nonce":"(\w+)"'
-        )
-        if not nonce:
-            return get_retry_request(
-                response.request, spider=self, reason='Malformed response'
+        try:
+            data = response.json()
+        except json.decoder.JSONDecodeError:
+            self.logger.exception(
+                'Response for %s %s couldn\'t be parsed.', code, _type
             )
-
-        form = {
-            'symbol': code,
-            'quotes_earnings_nonce': nonce,
-            'page': '0',
-            'type': 'null',
-            'action': 'more_quotes_earnings',
-            'perPage': '100'
-        }
-
-        yield FormRequest(
-            url=self.api_url,
-            formdata=form,
-            callback=self.parse_earnings_data,
-            cb_kwargs={
-                'code': code
-            },
-            dont_filter=True,
-        )
-
-    def parse_earnings_data(self, response, code):
-        """Parse JSON with earnings data into CSV."""
-        results = json.loads(response.body)
-        if isinstance(results, bool) or isinstance(results, int):
-            self.logger.warning(
-                'Server failed in returning the earnings data for %s', code
-            )
-            return get_retry_request(
-                response.request, spider=self, reason='Malformed response'
-            )
-
-        if not results.get('aaData'):
-            self.logger.info('Earnings data for %s returned empty.', code)
             return
 
-        results = results.get('aaData')
-        for row in results:
-            loader = AssetEarningsLoader(item=AssetEarningsItem())
-            loader.add_value('asset_code', code)
-            loader.add_value('type', row[0])
-            loader.add_value('value', row[1])
-            loader.add_value('pct_factor', row[2])
-            loader.add_value('emission_value', row[3])
-            loader.add_value('date_of_approval', row[4])
-            loader.add_value('date_of_record', row[5])
-            loader.add_value('date_of_payment', row[6])
-            item = loader.load_item()
-            yield item
+        if not data or isinstance(data, bool):
+            self.logger.warning(
+                'Response for %s %s returned a malformed JSON.', code, _type
+            )
+            return
 
-    def _build_asset_list_request(self, nonce, page=1):
-        """Builds request for asset list page"""
-        form = {
-            'action': 'tool_altas_e_baixas',
-            'pagination': f'{page}',
-            'perPage': f'{self.results_per_page}',
-            'altas_e_baixas_table_nonce': nonce,
-            'market': '0'
-        }
-        return FormRequest(
-            url=self.api_url,
-            formdata=form,
-            callback=self.parse_asset_list,
-            cb_kwargs={
-                'page': page
-            },
-            meta={
-                'nonce': nonce
-            },
-            dont_filter=True,
-        )
+        for key in args:
+            if key not in data:
+                self.logger.warning(
+                    "Expected key %s for %s %s isn't included in the response",
+                    key, code, _type
+                )
+                return
 
-    def _get_date_attributes(self):
-        """Return date values according to received args or standard values."""
+        return data
+
+    def _get_date_attributes(self, st_offset=730):
+        """Return date values according to received args or standard values.
+        :param st_offset: Number of days to offset the initial date. Default to
+        730 (2 years).
+        :type st_offset: int
+        """
         start_arg = getattr(self, 'start_date', None)
         end_arg = getattr(self, 'end_date', None)
 
         initial_date = (
             start_arg or
-            (datetime.today() - timedelta(days=730)).strftime('%d/%m/%Y')
+            (datetime.today() - timedelta(days=st_offset)).strftime('%d/%m/%Y')
         )
         final_date = end_arg or datetime.today().strftime('%d/%m/%Y')
         return initial_date, final_date
