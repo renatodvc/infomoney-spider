@@ -92,8 +92,9 @@ class InfomoneySpider(Spider):
         """Yields requests for the historical price data and earnings pages"""
         # The response is a redirect to the correct page for the asset code.
         if response.status == 404:
-            self.logger.error(
-                'No redirect from asset code %s. Page returned 404.', code
+            self.logger.warning(
+                'Page for %s didn\'t redirect, returned 404. Maybe the asset '
+                'is no longer tradable.', code
             )
             return
         if response.url.endswith('.png') or response.url.endswith('.gif'):
@@ -187,6 +188,8 @@ class InfomoneySpider(Spider):
             item = loader.load_item()
             yield item
 
+        self.logger.info('Parsed %s earning records for %s', len(data), code)
+
     def parse_fii_prices(self, response, code):
         """Parse JSON with FII historical price data into Item."""
         data = self._is_data_valid(response, code, 'prices', 'dataValor')
@@ -202,6 +205,10 @@ class InfomoneySpider(Spider):
             loader.add_value('close', row['valor'])
             item = loader.load_item()
             yield item
+
+        self.logger.info(
+            'Parsed %s price records for %s', len(data['dataValor']), code
+        )
 
     def parse_earnings_data(self, response, code):
         """Parse JSON with earnings data into Item."""
@@ -224,6 +231,10 @@ class InfomoneySpider(Spider):
             item = loader.load_item()
             yield item
 
+        self.logger.info(
+            'Parsed %s earnings records for %s', len(data.get('aaData')), code
+        )
+
     def parse_prices_data(self, response, code):
         """Parse JSON with historical price data into Item."""
         data = self._is_data_valid(response, code, 'prices')
@@ -245,6 +256,8 @@ class InfomoneySpider(Spider):
             loader.add_value('variation', row[3])
             item = loader.load_item()
             yield item
+
+        self.logger.info('Parsed %s price records for %s', len(data), code)
 
     def _is_data_valid(self, response, code, _type, *args):
         """Checks if the response isn't empty or malformed.

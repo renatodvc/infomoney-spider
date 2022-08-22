@@ -42,10 +42,12 @@ Por padrão ambos os pipelines `SplitInCSVsPipeline` e `StoreInDatabasePipeline`
 
 - **StoreInDatabasePipeline**: Se nenhuma informação de conexão com o banco de dados for incluída no campo `DATABASE_URI` do `settings.py`, essa pipeline se desativará automaticamente. A pipeline utiliza da ORM do [SQLAlchemy](https://www.sqlalchemy.org/), para suportar diferentes opções de banco de dados, [veja quais são eles](https://docs.sqlalchemy.org/en/13/dialects/index.html). Quando ativa, os dados de preço e proventos serão armazenados nas tabelas `assets_earnings` e `assets_prices` respectivamente. 
 
-### Alertas:
+### Alertas e Erros:
 - `INFO: Earnings data for XXXX returned empty.`: A maioria dos ativos listados não possuem dados de proventos disponíveis.
 - `ERROR: No redirect from asset code BLCP11. Page returned 404.`: A página de alguns ativos não redireciona como esperado, é possível que a página exista, mas o link que consta na [fonte](https://www.infomoney.com.br/ferramentas/altas-e-baixas) está quebrado.
 - `SQLite Decimals Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.`: Os dados numéricos são armazenados como objetos Decimals, o banco de dados SQLite não suporta esse tipo nativamente, o que pode causar problemas de arredondamento.
+- `[SQL: ALTER TABLE assets_prices ALTER COLUMN timestamp DROP NOT NULL]` se estiver usando **SQLite** e fazendo o upgrade das tabelas. SQLite não suporta essa operação, você pode executar um *workaround* alterando como a migração é executada. Cheque os [comentários aqui](https://github.com/renatodvc/infomoney-spider/blob/master/alembic/versions/8fc3489641f3_removed_not_null_constraint_from_.py).
+
 
 ### Formato dos dados:
 Os dados não sofrem alteração e são armazenados integralmente como são disponibilizados pela plataforma da Infomoney.
@@ -112,10 +114,11 @@ By default, both the `SplitInCSVsPipeline` and `StoreInDatabasePipeline` pipelin
 
 - **StoreInDatabasePipeline**: If no database connection information is included in the `DATABASE_URI` field of `settings.py`, this pipeline will be disabled automatically. The pipeline uses the [SQLAlchemy](https://www.sqlalchemy.org/) ORM, to support multiple database options, [see what they are](https://docs.sqlalchemy.org/en/13/dialects/index.html). When activated, the price and earnings data will be stored in the `assets_earnings` and `assets_prices` tables respectively.
 
-### Warnings:
+### Warnings and Errors:
 - `INFO: Earnings data for XXXX returned empty.`: Most of the listed assets do not have earnings data available.
 - `ERROR: No redirect from asset code BLCP11. Page returned 404.`: Some asset pages doesn't redirect as expected, it is possible that the page exists, but the link in the [source page](https://www.infomoney.com.br/ferramentas/altas-e-baixas) is broken.
 - `SQLite Decimals Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.`: Numerical data is stored as Decimal objects, the SQLite database does not support this type natively, which can cause rounding errors and other issues.
+- `[SQL: ALTER TABLE assets_prices ALTER COLUMN timestamp DROP NOT NULL]` when using **SQLite** and upgrading the tables. SQLite doesn't support this operation, you can work around it by changing how the migration is performed. Check the [comments here](https://github.com/renatodvc/infomoney-spider/blob/master/alembic/versions/8fc3489641f3_removed_not_null_constraint_from_.py).
 
 ### Data format:
 The data is not altered by the spider and is stored in its entirety as provided by the Infomoney platform. (*Data types are converted when storing in SQL databases.*)

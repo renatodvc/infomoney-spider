@@ -78,9 +78,7 @@ class StoreInDatabasePipeline:
             self.logger.debug(
                 'Record "%s" already exists in the database, dropping...', _id
             )
-            spider.crawler.stats.inc_value(
-                f'dropped/sql/earnings/duplicated/{item["asset_code"]}'
-            )
+            spider.crawler.stats.inc_value('dropped/sql/earnings/duplicated')
             return item
 
         try:
@@ -129,9 +127,7 @@ class StoreInDatabasePipeline:
             self.logger.debug(
                 'Record "%s" already exists in the database, dropping...', _id
             )
-            spider.crawler.stats.inc_value(
-                f'dropped/sql/price/duplicated/{item["asset_code"]}'
-            )
+            spider.crawler.stats.inc_value('dropped/sql/price/duplicated')
             return item
 
         try:
