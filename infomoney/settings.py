@@ -8,6 +8,7 @@ NEWSPIDER_MODULE = 'infomoney.spiders'
 ROBOTSTXT_OBEY = False
 
 ITEM_PIPELINES = {
+    'infomoney.pipelines.DatetimeEnforcementPipeline': 50,
     'infomoney.pipelines.SplitInCSVsPipeline': 100,
     'infomoney.pipelines.StoreInDatabasePipeline': 200,
 }
