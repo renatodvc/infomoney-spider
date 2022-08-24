@@ -9,7 +9,7 @@ class AssetPriceModel(Base):
     _id = Column(String(32), nullable=False, unique=True)  # Prevent duplicates
     asset_code = Column(String(10), nullable=False)
     date = Column(DateTime, nullable=False)
-    timestamp = Column(TIMESTAMP, nullable=False)
+    timestamp = Column(TIMESTAMP)
     open = Column(Numeric(scale=2))
     high = Column(Numeric(scale=2))
     low = Column(Numeric(scale=2))

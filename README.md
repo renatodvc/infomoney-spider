@@ -28,8 +28,8 @@ $ scrapy crawl infomoney [-a param=value]
 
 ### Parâmetros aceitos:
 *Todos os parâmetros são opcionais.*
-- **asset**: Código do ativo na B3. Se nenhum ativo for informado o spider fará requisições para todos os ativos disponíveis na [lista de cotações da Infomoney](https://www.infomoney.com.br/ferramentas/altas-e-baixas/). Ex: `-a asset=PETR4`
-- **start_date**: Busca os dados históricos a partir da data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada a requisição será feita para o período máximo disponível (2 anos). Ex: `-a start_date=01/01/2019`
+- **assets**: Código dos ativos na B3, aceita múltiplos ativos separados por virgúla. Se nenhum ativo for informado o spider fará requisições para todos os ativos disponíveis na [lista de cotações da Infomoney](https://www.infomoney.com.br/ferramentas/altas-e-baixas/). Ex: `-a assets=PETR4,PETR3`
+- **start_date**: Busca os dados históricos a partir da data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada a requisição será feita para o período máximo disponível (2 anos para ações, FIIs podem ter um período mais longo disponível). Ex: `-a start_date=01/01/2019`
 - **end_date**: Busca os dados históricos até a data informada (utilizar padrão *dd/mm/yyyy*). Se nenhuma data for informada será utilizado o dia da execução. Ex: `-a end_date=01/01/2020`
 - **no_earnings**: Se `True` o spider não fará coleta dos dados de proventos (JSCP, dividendos, etc). Se não informado a coleta é realizada automaticamente. Ex: `-a no_earnings=True`
 - **no_price**: Se `True` o spider não fará coleta dos dados de preço (Abertura, Máxima, Fechamento, etc). Se não informado a coleta é realizada automaticamente. Ex: `-a no_price=True`
@@ -42,13 +42,15 @@ Por padrão ambos os pipelines `SplitInCSVsPipeline` e `StoreInDatabasePipeline`
 
 - **StoreInDatabasePipeline**: Se nenhuma informação de conexão com o banco de dados for incluída no campo `DATABASE_URI` do `settings.py`, essa pipeline se desativará automaticamente. A pipeline utiliza da ORM do [SQLAlchemy](https://www.sqlalchemy.org/), para suportar diferentes opções de banco de dados, [veja quais são eles](https://docs.sqlalchemy.org/en/13/dialects/index.html). Quando ativa, os dados de preço e proventos serão armazenados nas tabelas `assets_earnings` e `assets_prices` respectivamente. 
 
-### Alertas:
+### Alertas e Erros:
 - `INFO: Earnings data for XXXX returned empty.`: A maioria dos ativos listados não possuem dados de proventos disponíveis.
 - `ERROR: No redirect from asset code BLCP11. Page returned 404.`: A página de alguns ativos não redireciona como esperado, é possível que a página exista, mas o link que consta na [fonte](https://www.infomoney.com.br/ferramentas/altas-e-baixas) está quebrado.
 - `SQLite Decimals Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.`: Os dados numéricos são armazenados como objetos Decimals, o banco de dados SQLite não suporta esse tipo nativamente, o que pode causar problemas de arredondamento.
+- `[SQL: ALTER TABLE assets_prices ALTER COLUMN timestamp DROP NOT NULL]` se estiver usando **SQLite** e fazendo o upgrade das tabelas. SQLite não suporta essa operação, você pode executar um *workaround* alterando como a migração é executada. Cheque os [comentários aqui](https://github.com/renatodvc/infomoney-spider/blob/master/alembic/versions/8fc3489641f3_removed_not_null_constraint_from_.py).
+
 
 ### Formato dos dados:
-Os dados não sofrem alteração e são armazenados integralmente como são disponibilizados pela plataforma da Infomoney.
+Em geral, os dados não sofrem alteração e são armazenados integralmente como são disponibilizados pela plataforma da Infomoney. (*Datas são convertidas em objetos `datetime` e quando armazenados em banco de dados SQL os dados podem sofrer conversões de tipo.*)
 
 A estrutura colunar dos dados na fonte seguem os seguintes padrões:
 
@@ -68,6 +70,7 @@ A estrutura colunar dos dados na fonte seguem os seguintes padrões:
 
 ## Licença
 [MIT](https://github.com/renatodvc/infomoney-spider/blob/master/LICENSE)
+
 
 ---
  ![](https://github.githubassets.com/images/icons/emoji/unicode/1f1ec-1f1e7.png?v8) ![](https://github.githubassets.com/images/icons/emoji/unicode/1f1fa-1f1f8.png?v8)
@@ -97,8 +100,8 @@ $ scrapy crawl infomoney [-a param=value]
 
 ### Accepted parameters:
 *All parameters are optional.*
-- **asset**: Asset code in B3 (Brazillian stock exchange). If no asset is informed, the spider will make requests for all assets available in the [Infomoney's asset list](https://www.infomoney.com.br/ferramentas/altas-e-baixas/). Ex: `-a asset=PETR4`
-- **start_date**: Search the historical data starting from the informed date (use *dd/mm/yyyy* format). If no date is given, the request will be made for the maximum available period (2 years). Ex: `-a start_date=01/01/2019`
+- **assets**: Assets code in B3 (Brazillian stock exchange), accepts multiple assets separated by a comma. If no asset is informed, the spider will make requests for all assets available in the [Infomoney's asset list](https://www.infomoney.com.br/ferramentas/altas-e-baixas/). Ex: `-a assets=PETR4,PETR3`
+- **start_date**: Search the historical data starting from the informed date (use *dd/mm/yyyy* format). If no date is given, the request will be made for the maximum available period (2 years for stocks, REITs may have longer period available). Ex: `-a start_date=01/01/2019`
 - **end_date**: Search historical data up to the given date (use *dd/mm/yyyy* format). If no date is given, the current day will be used. Ex: `-a end_date=01/01/2020`
 - **no_earnings**: If `True` the spider will not collect the earnings data. If not informed, scraping is performed automatically. Ex: `-a no_earnings=True`
 - **no_price**: If `True` the spider will not collect the price data (Open, High, Close ...). If not informed, scraping is performed automatically. Ex: `-a no_price=True`
@@ -111,13 +114,14 @@ By default, both the `SplitInCSVsPipeline` and `StoreInDatabasePipeline` pipelin
 
 - **StoreInDatabasePipeline**: If no database connection information is included in the `DATABASE_URI` field of `settings.py`, this pipeline will be disabled automatically. The pipeline uses the [SQLAlchemy](https://www.sqlalchemy.org/) ORM, to support multiple database options, [see what they are](https://docs.sqlalchemy.org/en/13/dialects/index.html). When activated, the price and earnings data will be stored in the `assets_earnings` and `assets_prices` tables respectively.
 
-### Warnings:
+### Warnings and Errors:
 - `INFO: Earnings data for XXXX returned empty.`: Most of the listed assets do not have earnings data available.
 - `ERROR: No redirect from asset code BLCP11. Page returned 404.`: Some asset pages doesn't redirect as expected, it is possible that the page exists, but the link in the [source page](https://www.infomoney.com.br/ferramentas/altas-e-baixas) is broken.
 - `SQLite Decimals Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.`: Numerical data is stored as Decimal objects, the SQLite database does not support this type natively, which can cause rounding errors and other issues.
+- `[SQL: ALTER TABLE assets_prices ALTER COLUMN timestamp DROP NOT NULL]` when using **SQLite** and upgrading the tables. SQLite doesn't support this operation, you can work around it by changing how the migration is performed. Check the [comments here](https://github.com/renatodvc/infomoney-spider/blob/master/alembic/versions/8fc3489641f3_removed_not_null_constraint_from_.py).
 
 ### Data format:
-The data is not altered by the spider and is stored in its entirety as provided by the Infomoney platform. (*Data types are converted when storing in SQL databases.*)
+In general, the data is not altered by the spider and is stored in its entirety as provided by the Infomoney platform. (*Dates are converted into `datetime` objects and when storing data in SQL databases they may have their types converted.*)
 
 The columnar structure of the data at the source follows these patterns:
 
