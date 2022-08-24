@@ -226,7 +226,7 @@ tomli==2.0.1
     #   -r requirements.in
     #   build
     #   pep517
-twisted==20.3.0
+twisted==22.4.0
     # via
     #   -r requirements.in
     #   scrapy
