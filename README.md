@@ -50,7 +50,7 @@ Por padrão ambos os pipelines `SplitInCSVsPipeline` e `StoreInDatabasePipeline`
 
 
 ### Formato dos dados:
-Os dados não sofrem alteração e são armazenados integralmente como são disponibilizados pela plataforma da Infomoney.
+Em geral, os dados não sofrem alteração e são armazenados integralmente como são disponibilizados pela plataforma da Infomoney. (*Datas são convertidas em objetos `datetime` e quando armazenados em banco de dados SQL os dados podem sofrer conversões de tipo.*)
 
 A estrutura colunar dos dados na fonte seguem os seguintes padrões:
 
@@ -121,7 +121,7 @@ By default, both the `SplitInCSVsPipeline` and `StoreInDatabasePipeline` pipelin
 - `[SQL: ALTER TABLE assets_prices ALTER COLUMN timestamp DROP NOT NULL]` when using **SQLite** and upgrading the tables. SQLite doesn't support this operation, you can work around it by changing how the migration is performed. Check the [comments here](https://github.com/renatodvc/infomoney-spider/blob/master/alembic/versions/8fc3489641f3_removed_not_null_constraint_from_.py).
 
 ### Data format:
-The data is not altered by the spider and is stored in its entirety as provided by the Infomoney platform. (*Data types are converted when storing in SQL databases.*)
+In general, the data is not altered by the spider and is stored in its entirety as provided by the Infomoney platform. (*Dates are converted into `datetime` objects and when storing data in SQL databases they may have their types converted.*)
 
 The columnar structure of the data at the source follows these patterns:
 
