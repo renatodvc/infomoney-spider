@@ -20,7 +20,7 @@ build==0.8.0
     # via
     #   -r requirements.in
     #   pip-tools
-certifi==2022.6.15
+certifi==2022.12.7
     # via
     #   -r requirements.in
     #   requests
@@ -37,10 +37,7 @@ click==8.1.3
     #   -r requirements.in
     #   pip-tools
 colorama==0.4.5
-    # via
-    #   -r requirements.in
-    #   build
-    #   click
+    # via -r requirements.in
 constantly==15.1.0
     # via
     #   -r requirements.in
@@ -77,18 +74,9 @@ idna==2.10
     #   requests
     #   tldextract
 importlib-metadata==2.0.0
-    # via
-    #   -r requirements.in
-    #   alembic
-    #   build
-    #   click
-    #   flake8
-    #   pep517
-    #   sqlalchemy
+    # via -r requirements.in
 importlib-resources==5.9.0
-    # via
-    #   -r requirements.in
-    #   alembic
+    # via -r requirements.in
 incremental==17.5.0
     # via
     #   -r requirements.in
@@ -222,10 +210,7 @@ tldextract==3.3.1
     #   -r requirements.in
     #   scrapy
 tomli==2.0.1
-    # via
-    #   -r requirements.in
-    #   build
-    #   pep517
+    # via -r requirements.in
 twisted==20.3.0
     # via
     #   -r requirements.in
@@ -246,8 +231,6 @@ zipp==3.4.0
     # via
     #   -r requirements.in
     #   importlib-metadata
-    #   importlib-resources
-    #   pep517
 zope-interface==5.1.0
     # via
     #   -r requirements.in
